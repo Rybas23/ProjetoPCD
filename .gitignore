@@ -1,0 +1,22 @@
+git rm -r --cached out/# Compiled class files
+*.class
+
+# Log files
+*.log
+
+# BlueJ / IntelliJ / VSCode
+*.ctxt
+/.idea/
+/.vscode/
+
+# Build and output directories
+/out/
+/build/
+/target/
+
+# JARs
+*.jar
+
+# OS files
+.DS_Store
+Thumbs.db
