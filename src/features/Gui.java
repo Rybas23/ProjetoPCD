@@ -21,7 +21,7 @@ public class Gui {
         this.teamName = teamName;
         this.username = username;
 
-        frame = new JFrame("IsKahoot - " + username);
+        frame = new JFrame("Kahoot - " + username);
         createContent();
         frame.pack();
         frame.setVisible(true);
@@ -88,13 +88,13 @@ public class Gui {
         Question q = gameState.getCurrentQuestion();
         boolean correct = q.isCorrect(optionIndex);
         JOptionPane.showMessageDialog(frame,
-                correct ? "Correct!" : "Wrong!",
-                "Answer", JOptionPane.INFORMATION_MESSAGE);
+                correct ? "Correto!" : "Errado!",
+                "Resposta", JOptionPane.INFORMATION_MESSAGE);
 
         if (gameState.nextQuestion())
             showNextQuestion();
         else
-            JOptionPane.showMessageDialog(frame, "Game Over!");
+            JOptionPane.showMessageDialog(frame, "FIM");
     }
 
     private void disableButtons() {
