@@ -64,7 +64,7 @@ public class GameState {
     public synchronized Map<String, Integer> getScoreboard() {
         Map<String, Integer> scores = new HashMap<>();
         for (Team t : teams.values())
-            scores.put(t.getName(), t.getTotalScore());
+            scores.put(t.getName(), Integer.valueOf(t.getTotalScore()));
         return scores;
     }
 
