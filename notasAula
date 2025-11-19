@@ -1,0 +1,12 @@
+NOTAS AULAS
+
+
+PCD:
+
+Comunicação com objetos: ObjectOutputStream ObjectInputStream para receber e enviar...
+
+Swithc no input do Cliente instanceOf …
+Objeto Tempo, Classificação, Mensagem ….
+Vários Objetos com getters…
+
+Objetos implements Serialize para poder enviar nos sockets
