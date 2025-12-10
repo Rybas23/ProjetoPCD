@@ -1,11 +1,8 @@
-package features;
+package kahoot.gui;
 
-import features.server.GameState;
-import features.server.Question;
+import kahoot.game.GameState;
 
 import javax.swing.*;
-import java.awt.*;
-import java.util.List;
 
 public class Gui {
     private final JFrame frame;
@@ -22,11 +19,12 @@ public class Gui {
         this.username = username;
 
         frame = new JFrame("Kahoot - " + username);
-        createContent();
+        //createContent();
         frame.pack();
         frame.setVisible(true);
     }
 
+    /**
     private void createContent() {
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         frame.setSize(600, 500);
@@ -57,7 +55,7 @@ public class Gui {
 
     // Mostra a próxima pergunta no ecrã
     public void showNextQuestion() {
-        Question q = gameState.getCurrentQuestion();
+        //Question q = gameState.getCurrentQuestion();
         if (q == null) {
             JOptionPane.showMessageDialog(frame, "Fim do jogo!");
             frame.dispose();
@@ -91,15 +89,17 @@ public class Gui {
                 correct ? "Correto!" : "Errado!",
                 "Resposta", JOptionPane.INFORMATION_MESSAGE);
 
-        if (gameState.nextQuestion())
+        if (gameState.nextQuestion()) {
             showNextQuestion();
-        else
+        } else {
             JOptionPane.showMessageDialog(frame, "FIM");
+            frame.dispose();
+        }
     }
 
     private void disableButtons() {
         for (Component c : answersPanel.getComponents()) {
             if (c instanceof JButton) c.setEnabled(false);
         }
-    }
+    }**/
 }

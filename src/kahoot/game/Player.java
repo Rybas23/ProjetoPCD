@@ -1,4 +1,4 @@
-package features.server;
+package kahoot.game;
 
 public class Player {
     private final String username;

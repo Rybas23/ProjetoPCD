@@ -1,18 +1,18 @@
-package features;
+package kahoot.utils;
 
 import com.google.gson.Gson;
+import kahoot.game.Quiz;
 
 import java.io.FileReader;
-import java.util.ArrayList;
 
 public class JsonReader {
-    public static ArrayList<JsonStructure.Quizz> readQuizzes(String filename) {
+    public static Quiz readQuiz(String filename) {
         try (FileReader reader = new FileReader(filename)) {
             Gson gson = new Gson();
 
-            JsonStructure jsonStructure = gson.fromJson(reader, JsonStructure.class);
+            Quiz quiz = gson.fromJson(reader, Quiz.class);
 
-            return jsonStructure.getQuizzes();
+            return quiz;
         } catch (Exception e) {
             e.printStackTrace();
             return null;

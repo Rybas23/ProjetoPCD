@@ -1,4 +1,4 @@
-package features.server;
+package kahoot.game;
 
 import java.util.*;
 
@@ -28,6 +28,19 @@ public class Team {
         }
     }
 
-    public String getName() { return name; }
-    public int getTotalScore() { return totalScore; }
+    public String getName() {
+        return name;
+    }
+
+    public Player getPlayer(String username) {
+        return players.get(username);
+    }
+
+    public int getTotalScore() {
+        return totalScore;
+    }
+
+    public boolean playerExists(String username) {
+        return players.containsKey(username);
+    }
 }
