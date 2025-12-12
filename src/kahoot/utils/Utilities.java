@@ -12,6 +12,7 @@ public class Utilities {
     public static AtomicInteger AnswerMessagesId = new AtomicInteger(0);
     public static AtomicInteger GameEndMessagesId = new AtomicInteger(0);
     public static AtomicInteger ScoresMessagesId = new AtomicInteger(0);
+    public static AtomicInteger TimerMessagesId = new AtomicInteger(0);
     public static AtomicInteger GameStateId = new AtomicInteger(0);
 
     public static Quiz readQuiz(String filename) {

@@ -97,6 +97,20 @@ public class ClientKahoot {
         }
     }
 
+    public void shutdownFromGui() {
+        running = false;
+        try {
+            if (out != null) {
+                out.writeObject(new Message(-1, "FIM"));
+                out.flush();
+            }
+        } catch (Exception ignored) {}
+        closeSilently();
+        if (listenerThread != null && listenerThread.isAlive()) {
+            listenerThread.interrupt();
+        }
+    }
+
     private void startListener() {
         running = true;
         listenerThread = new Thread(() -> {
@@ -122,11 +136,16 @@ public class ClientKahoot {
                     } else if (incoming instanceof GameEndMessage) {
                         GameEndMessage gameEndMessage = (GameEndMessage) incoming;
                         // update GUI after Game Ends
-                        SwingUtilities.invokeLater(() -> clientGui.displayEndGame(gameEndMessage));
+                        SwingUtilities.invokeLater(() -> clientGui.displayGameStats(gameEndMessage, "Game Over - Final Scores"));
                     } else if (incoming instanceof ScoresMessage) {
                         ScoresMessage scoresMessage = (ScoresMessage) incoming;
                         // update GUI after Game Ends
-                        SwingUtilities.invokeLater(() -> clientGui.displayRoundScores(scoresMessage));
+                        SwingUtilities.invokeLater(() -> clientGui.updateScoreboard(scoresMessage));
+                    } else if (incoming instanceof TimerMessage) {
+                        TimerMessage timerMessage = (TimerMessage) incoming;
+                        // convert to seconds, clamp to >= 0
+                        long seconds = Math.max(0, timerMessage.getRemainingMillis() / 1000);
+                        SwingUtilities.invokeLater(() -> clientGui.updateTimer(seconds));
                     } else if (incoming instanceof Message) {
                         Message m = (Message) incoming;
                         String msgText = m.getMessage();

@@ -102,6 +102,9 @@ public class GameState {
     public Team getTeam(String teamName) {
         return teams.get(teamName);
     }
+    public Collection<Player> getPlayers() {
+        return players.values();
+    }
 
     public boolean teamExists(String teamName) {
         return teams.containsKey(teamName);

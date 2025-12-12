@@ -10,6 +10,8 @@ import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Map;
 
 public class Gui {
     private final String gameName;
@@ -21,6 +23,8 @@ public class Gui {
     private JFrame frame;
     private JLabel questionLabel;
     private JPanel answersPanel;
+    private JLabel timerLabel;
+    private JPanel scoreboardPanel;
 
     public Gui(String gameName, String teamName, String username, ClientKahoot client) {
         this.gameName = gameName;
@@ -39,20 +43,38 @@ public class Gui {
         questionLabel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         questionLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        answersPanel = new JPanel(new GridLayout(2, 2, 15, 15));
-        answersPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        timerLabel = new JLabel("Time left: --s");
+        timerLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+        JPanel north = new JPanel(new BorderLayout());
+        north.add(questionLabel, BorderLayout.CENTER);
+        north.add(timerLabel, BorderLayout.EAST);
+
+        answersPanel = new JPanel(new GridLayout(2, 2, 8, 8));
+        answersPanel.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+
+        // painel do scoreboard (players + teams) mantido sempre na UI
+        scoreboardPanel = new JPanel(new GridLayout(1, 2, 10, 0));
+        scoreboardPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        scoreboardPanel.setPreferredSize(new Dimension(260, 0));
 
         frame = new JFrame("Kahoot - " + username + " (" + teamName + ")" + " - " + gameName);
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         frame.setLocationRelativeTo(null);
         frame.setSize(800, 600);
         frame.getContentPane().setLayout(new BorderLayout(0, 10));
-        frame.getContentPane().add(questionLabel, BorderLayout.NORTH);
+        frame.getContentPane().add(north, BorderLayout.NORTH);
 
         JPanel centerWrapper = new JPanel(new BorderLayout());
         centerWrapper.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         centerWrapper.add(answersPanel, BorderLayout.CENTER);
         frame.getContentPane().add(centerWrapper, BorderLayout.CENTER);
+
+        // scoreboard fica sempre no lado direito
+        frame.getContentPane().add(scoreboardPanel, BorderLayout.EAST);
+
+        // mostrar logo estrutura vazia de scoreboard
+        updateScoreboard(null);
 
         frame.addWindowListener(new WindowAdapter() {
             @Override
@@ -63,115 +85,29 @@ public class Gui {
         frame.setVisible(true);
     }
 
-    public void displayEndGame(GameEndMessage gameEndMessage) {
-        if (frame == null) return;
+    public void updateTimer(long seconds) {
+        timerLabel.setText("Time left: " + seconds + "s");
+    }
 
-        // use the two maps provided by the message
-        java.util.Map<String, Integer> playersMap = gameEndMessage.getPlayerScores();
-        java.util.Map<String, Integer> teamsMap = gameEndMessage.getTeamScores();
+    public void displayGameStats(GameEndMessage gameEndMessage, String title) {
+        disableButtons();
 
-        java.util.List<java.util.Map.Entry<String, Integer>> sortedPlayers =
-                new java.util.ArrayList<>(playersMap.entrySet());
-        sortedPlayers.sort((a, b) -> Integer.compare(b.getValue(), a.getValue()));
+        timerLabel.setVisible(false);
 
-        java.util.List<java.util.Map.Entry<String, Integer>> sortedTeams =
-                new java.util.ArrayList<>(teamsMap.entrySet());
-        sortedTeams.sort((a, b) -> Integer.compare(b.getValue(), a.getValue()));
+        // reaproveita o updateScoreboard para mostrar o estado final
+        ScoresMessage scores = new ScoresMessage(
+                -1,
+                gameEndMessage.getTeamScores(),
+                gameEndMessage.getPlayerScores()
+        );
+        updateScoreboard(scores);
 
-        questionLabel.setText("Game Over - Final Scores");
-        questionLabel.setFont(new Font("SansSerif", Font.BOLD, 24));
-        questionLabel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-        questionLabel.setHorizontalAlignment(SwingConstants.CENTER);
-
-        // players panel (left)
-        JPanel playersPanel = new JPanel();
-        playersPanel.setLayout(new BoxLayout(playersPanel, BoxLayout.Y_AXIS));
-        playersPanel.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
-        playersPanel.setOpaque(false);
-
-        for (java.util.Map.Entry<String, Integer> e : sortedPlayers) {
-            JPanel row = new JPanel(new BorderLayout());
-            row.setOpaque(false);
-
-            JLabel nameLabel = new JLabel(e.getKey());
-            nameLabel.setFont(new Font("SansSerif", Font.PLAIN, 16));
-
-            JLabel scoreLabel = new JLabel(String.valueOf(e.getValue()));
-            scoreLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
-            scoreLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-
-            row.add(nameLabel, BorderLayout.WEST);
-            row.add(scoreLabel, BorderLayout.EAST);
-            row.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
-
-            row.setAlignmentX(Component.LEFT_ALIGNMENT);
-            row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
-
-            playersPanel.add(row);
-            playersPanel.add(Box.createRigidArea(new Dimension(0, 4)));
-        }
-
-        // teams panel (right)
-        JPanel teamsPanel = new JPanel();
-        teamsPanel.setLayout(new BoxLayout(teamsPanel, BoxLayout.Y_AXIS));
-        teamsPanel.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
-        teamsPanel.setOpaque(false);
-
-        if (sortedTeams.isEmpty()) {
-            JLabel none = new JLabel("No team scores available");
-            none.setFont(new Font("SansSerif", Font.ITALIC, 14));
-            none.setAlignmentX(Component.LEFT_ALIGNMENT);
-            teamsPanel.add(none);
-        } else {
-            for (java.util.Map.Entry<String, Integer> e : sortedTeams) {
-                JPanel row = new JPanel(new BorderLayout());
-                row.setOpaque(false);
-
-                JLabel teamLabel = new JLabel(e.getKey());
-                teamLabel.setFont(new Font("SansSerif", Font.PLAIN, 16));
-
-                JLabel scoreLabel = new JLabel(String.valueOf(e.getValue()));
-                scoreLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
-                scoreLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-
-                row.add(teamLabel, BorderLayout.WEST);
-                row.add(scoreLabel, BorderLayout.EAST);
-                row.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
-
-                row.setAlignmentX(Component.LEFT_ALIGNMENT);
-                row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
-
-                teamsPanel.add(row);
-                teamsPanel.add(Box.createRigidArea(new Dimension(0, 4)));
-            }
-        }
-
-        // wrappers with subtitles
-        JPanel leftWrapper = new JPanel(new BorderLayout(0, 6));
-        leftWrapper.setOpaque(false);
-        JLabel leftSubtitle = new JLabel("Players", SwingConstants.CENTER);
-        leftSubtitle.setFont(new Font("SansSerif", Font.BOLD, 14));
-        leftSubtitle.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
-        leftWrapper.add(leftSubtitle, BorderLayout.NORTH);
-        leftWrapper.add(new JScrollPane(playersPanel), BorderLayout.CENTER);
-
-        JPanel rightWrapper = new JPanel(new BorderLayout(0, 6));
-        rightWrapper.setOpaque(false);
-        JLabel rightSubtitle = new JLabel("Teams", SwingConstants.CENTER);
-        rightSubtitle.setFont(new Font("SansSerif", Font.BOLD, 14));
-        rightSubtitle.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
-        rightWrapper.add(rightSubtitle, BorderLayout.NORTH);
-        rightWrapper.add(new JScrollPane(teamsPanel), BorderLayout.CENTER);
-
-        JPanel centerWrapper = new JPanel(new GridLayout(1, 2, 10, 0));
-        centerWrapper.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        centerWrapper.add(leftWrapper);
-        centerWrapper.add(rightWrapper);
+        questionLabel.setText(title);
 
         frame.getContentPane().removeAll();
         frame.getContentPane().setLayout(new BorderLayout(0, 10));
         frame.getContentPane().add(questionLabel, BorderLayout.NORTH);
-        frame.getContentPane().add(centerWrapper, BorderLayout.CENTER);
+        frame.getContentPane().add(scoreboardPanel, BorderLayout.CENTER);
 
         JPanel south = new JPanel(new FlowLayout(FlowLayout.CENTER));
         JButton closeBtn = new JButton("Close");
@@ -181,35 +117,20 @@ public class Gui {
 
         frame.revalidate();
         frame.repaint();
+
+        JOptionPane.showMessageDialog(
+                frame,
+                "The Game has ended. Check the final scores!",
+                "Game Over",
+                JOptionPane.INFORMATION_MESSAGE
+        );
     }
 
-    public void displayRoundScores(ScoresMessage scoresMessage) {
-        if (frame == null) return;
+    public static JPanel buildScoreboardPanel(JPanel jPanel, java.util.Map<String, Integer> dataMap, String title) {
+        java.util.List<Map.Entry<String, Integer>> sortedData = new ArrayList<>(dataMap.entrySet());
+        sortedData.sort((a, b) -> Integer.compare(b.getValue(), a.getValue()));
 
-        // use the two maps provided by the message
-        java.util.Map<String, Integer> playersMap = scoresMessage.getPlayerScores();
-        java.util.Map<String, Integer> teamsMap = scoresMessage.getTeamScores();
-
-        java.util.List<java.util.Map.Entry<String, Integer>> sortedPlayers =
-                new java.util.ArrayList<>(playersMap.entrySet());
-        sortedPlayers.sort((a, b) -> Integer.compare(b.getValue(), a.getValue()));
-
-        java.util.List<java.util.Map.Entry<String, Integer>> sortedTeams =
-                new java.util.ArrayList<>(teamsMap.entrySet());
-        sortedTeams.sort((a, b) -> Integer.compare(b.getValue(), a.getValue()));
-
-        questionLabel.setText("Round Scores");
-        questionLabel.setFont(new Font("SansSerif", Font.BOLD, 24));
-        questionLabel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-        questionLabel.setHorizontalAlignment(SwingConstants.CENTER);
-
-        // (reuse the same panel-building logic as displayEndGame)
-        JPanel playersPanel = new JPanel();
-        playersPanel.setLayout(new BoxLayout(playersPanel, BoxLayout.Y_AXIS));
-        playersPanel.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
-        playersPanel.setOpaque(false);
-
-        for (java.util.Map.Entry<String, Integer> e : sortedPlayers) {
+        for (java.util.Map.Entry<String, Integer> e : sortedData) {
             JPanel row = new JPanel(new BorderLayout());
             row.setOpaque(false);
 
@@ -227,72 +148,19 @@ public class Gui {
             row.setAlignmentX(Component.LEFT_ALIGNMENT);
             row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
 
-            playersPanel.add(row);
-            playersPanel.add(Box.createRigidArea(new Dimension(0, 4)));
+            jPanel.add(row);
+            jPanel.add(Box.createRigidArea(new Dimension(0, 4)));
         }
 
-        JPanel teamsPanel = new JPanel();
-        teamsPanel.setLayout(new BoxLayout(teamsPanel, BoxLayout.Y_AXIS));
-        teamsPanel.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
-        teamsPanel.setOpaque(false);
-
-        if (sortedTeams.isEmpty()) {
-            JLabel none = new JLabel("No team scores available");
-            none.setFont(new Font("SansSerif", Font.ITALIC, 14));
-            none.setAlignmentX(Component.LEFT_ALIGNMENT);
-            teamsPanel.add(none);
-        } else {
-            for (java.util.Map.Entry<String, Integer> e : sortedTeams) {
-                JPanel row = new JPanel(new BorderLayout());
-                row.setOpaque(false);
-
-                JLabel teamLabel = new JLabel(e.getKey());
-                teamLabel.setFont(new Font("SansSerif", Font.PLAIN, 16));
-
-                JLabel scoreLabel = new JLabel(String.valueOf(e.getValue()));
-                scoreLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
-                scoreLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-
-                row.add(teamLabel, BorderLayout.WEST);
-                row.add(scoreLabel, BorderLayout.EAST);
-                row.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
-
-                row.setAlignmentX(Component.LEFT_ALIGNMENT);
-                row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
-
-                teamsPanel.add(row);
-                teamsPanel.add(Box.createRigidArea(new Dimension(0, 4)));
-            }
-        }
-
-        JPanel leftWrapper = new JPanel(new BorderLayout(0, 6));
-        leftWrapper.setOpaque(false);
-        JLabel leftSubtitle = new JLabel("Players", SwingConstants.CENTER);
+        JPanel wrapper = new JPanel(new BorderLayout(0, 6));
+        wrapper.setOpaque(false);
+        JLabel leftSubtitle = new JLabel(title, SwingConstants.CENTER);
         leftSubtitle.setFont(new Font("SansSerif", Font.BOLD, 14));
         leftSubtitle.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
-        leftWrapper.add(leftSubtitle, BorderLayout.NORTH);
-        leftWrapper.add(new JScrollPane(playersPanel), BorderLayout.CENTER);
+        wrapper.add(leftSubtitle, BorderLayout.NORTH);
+        wrapper.add(new JScrollPane(jPanel), BorderLayout.CENTER);
 
-        JPanel rightWrapper = new JPanel(new BorderLayout(0, 6));
-        rightWrapper.setOpaque(false);
-        JLabel rightSubtitle = new JLabel("Teams", SwingConstants.CENTER);
-        rightSubtitle.setFont(new Font("SansSerif", Font.BOLD, 14));
-        rightSubtitle.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
-        rightWrapper.add(rightSubtitle, BorderLayout.NORTH);
-        rightWrapper.add(new JScrollPane(teamsPanel), BorderLayout.CENTER);
-
-        JPanel centerWrapper = new JPanel(new GridLayout(1, 2, 10, 0));
-        centerWrapper.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        centerWrapper.add(leftWrapper);
-        centerWrapper.add(rightWrapper);
-
-        frame.getContentPane().removeAll();
-        frame.getContentPane().setLayout(new BorderLayout(0, 10));
-        frame.getContentPane().add(questionLabel, BorderLayout.NORTH);
-        frame.getContentPane().add(centerWrapper, BorderLayout.CENTER);
-
-        frame.revalidate();
-        frame.repaint();
+        return wrapper;
     }
 
     public void displayQuestionAndOptions(QuestionMessage questionMessage) {
@@ -308,13 +176,59 @@ public class Gui {
             int index = i;
             JButton btn = new JButton(questionMessage.getOptions().get(i));
             btn.setFont(new Font("SansSerif", Font.BOLD, 14));
-            btn.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+            btn.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
             btn.addActionListener(e -> handleAnswer(index, btn, gameName));
             answersPanel.add(btn);
         }
 
         answersPanel.revalidate();
         answersPanel.repaint();
+    }
+
+    public void displayQuestionAndOptions(QuestionMessage questionMessage, ScoresMessage scoresMessage) {
+        displayQuestionAndOptions(questionMessage);
+        if (scoresMessage != null) {
+            updateScoreboard(scoresMessage);
+        }
+    }
+
+    /** Atualiza o painel do scoreboard mantendo-o sempre visível. */
+    public void updateScoreboard(ScoresMessage scoresMessage) {
+        if (scoreboardPanel == null) return;
+
+        scoreboardPanel.removeAll();
+
+        Map<String, Integer> playerScores;
+        Map<String, Integer> teamScores;
+
+        if (scoresMessage == null) {
+            // estrutura vazia, sem dados
+            playerScores = java.util.Collections.emptyMap();
+            teamScores = java.util.Collections.emptyMap();
+        } else {
+            playerScores = scoresMessage.getPlayerScores();
+            teamScores = scoresMessage.getTeamScores();
+        }
+
+        JPanel playersPanel = new JPanel();
+        playersPanel.setLayout(new BoxLayout(playersPanel, BoxLayout.Y_AXIS));
+        playersPanel.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+        playersPanel.setOpaque(false);
+
+        JPanel leftWrapper = buildScoreboardPanel(playersPanel, playerScores, "Players");
+
+        JPanel teamsPanel = new JPanel();
+        teamsPanel.setLayout(new BoxLayout(teamsPanel, BoxLayout.Y_AXIS));
+        teamsPanel.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+        teamsPanel.setOpaque(false);
+
+        JPanel rightWrapper = buildScoreboardPanel(teamsPanel, teamScores, "Teams");
+
+        scoreboardPanel.add(leftWrapper);
+        scoreboardPanel.add(rightWrapper);
+
+        scoreboardPanel.revalidate();
+        scoreboardPanel.repaint();
     }
 
     //Envia a resposta para o GameState
@@ -325,38 +239,7 @@ public class Gui {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
-        /*Question q = gameState.getCurrentQuestion();
-        boolean correct = q.isCorrect(optionIndex);
-        JOptionPane.showMessageDialog(frame,
-                correct ? "Correct!" : "Wrong!",
-                "Answer", JOptionPane.INFORMATION_MESSAGE);*/
     }
-
-    // Mostra a próxima pergunta no ecrã
-    /*public void showNextQuestion() {
-        Question q = gameState.getCurrentQuestion();
-        if (q == null) {
-            JOptionPane.showMessageDialog(frame, "Fim do jogo!");
-            frame.dispose();
-            return;
-        }
-
-        questionArea.setText(q.getQuestion());
-        answersPanel.removeAll();
-
-        ArrayList<String> options = q.getOptions();
-        for (int i = 0; i < options.size(); i++) {
-            int index = i;
-            JButton btn = new JButton(options.get(i));
-            btn.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-            btn.addActionListener(e -> handleAnswer(index, btn));
-            answersPanel.add(btn);
-        }
-
-        answersPanel.revalidate();
-        answersPanel.repaint();
-    }*/
 
     private void disableButtons() {
         for (Component c : answersPanel.getComponents()) {
