@@ -13,9 +13,9 @@ public class Team {
         this.totalScore = 0;
     }
 
-    public boolean addPlayer(String username) {
-        if (players.containsKey(username)) return false;
-        players.put(username, new Player(username));
+    public boolean addPlayer(Player player) {
+        if (players.containsKey(player.getUsername())) return false;
+        players.put(player.getUsername(), player);
         return true;
     }
 
@@ -26,6 +26,10 @@ public class Team {
             p.addScore(score);
             totalScore += score;
         }
+    }
+
+    public int getNumberOfPlayers() {
+        return players.size();
     }
 
     public String getName() {

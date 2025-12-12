@@ -1,5 +1,6 @@
 package kahoot.game;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 
 public class Question {

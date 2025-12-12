@@ -1,147 +1,162 @@
 package kahoot.client;
 
-import kahoot.messages.Message;
-import kahoot.server.ServerKahoot;
+import kahoot.gui.Gui;
+import kahoot.messages.*;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.io.*;
 import java.net.InetAddress;
 import java.net.Socket;
+
+import static kahoot.utils.Utilities.*;
 
 public class ClientKahoot {
     private Socket socket;
     private ObjectInputStream in;
     private ObjectOutputStream out;
-    private JLabel timerLabel;
-    private JFrame frame;
+
+    private Gui clientGui;
+
+    private volatile boolean running = false;
+    private Thread listenerThread;
 
     public static void main(String[] args) {
-        new ClientKahoot().runClient();
+        new ClientKahoot().runClient(args);
     }
 
-    public void runClient() {
-        createGui();
+    public void runClient(String[] args) {
+        if(args.length != 5) {
+            System.out.println("ERROR: Client is missing parameters.");
+            System.exit(1);
+        }
+
         try {
-            connectToServer();
-            //startReaderThread();
-            sendMessage("Client online.");
+            clientGui = new Gui(args[2], args[3], args[4], this);
+            connectToServer(args[0], args[1]);
+            sendPlayerDetails(args[2], args[3], args[4]);
+            waitForEnrollmentResponse();
+            printMessage("Client online.");
         } catch (IOException e) {
-            timerLabel.setText("Connection error");
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
             e.printStackTrace();
         }
     }
 
-    void connectToServer() throws IOException {
-        InetAddress endereco = InetAddress.getByName(null);
-        socket = new Socket(endereco, ServerKahoot.KAHOOT_PORT);
+    void connectToServer(String host, String port) throws IOException {
+        InetAddress endereco = InetAddress.getByName(host);
+        socket = new Socket(endereco, Integer.parseInt(port));
         System.out.println("Socket:" + socket);
 
         out = new ObjectOutputStream(socket.getOutputStream());
         in = new ObjectInputStream(socket.getInputStream());
-        SwingUtilities.invokeLater(() -> timerLabel.setText("Connected"));
     }
 
-    private void createGui() {
-        frame = new JFrame("Kahoot Client - Timer");
-        timerLabel = new JLabel("Connecting...", SwingConstants.CENTER);
-        timerLabel.setFont(timerLabel.getFont().deriveFont(48f));
-        frame.getContentPane().add(timerLabel, BorderLayout.CENTER);
-        frame.setSize(300, 150);
-        frame.setLocationRelativeTo(null);
-        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        frame.addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent e) {
+    void sendPlayerDetails(String gameName, String teamName, String playerName) throws IOException {
+        out.writeObject(new EnrollmentMessage(EnrollmentMessagesId.getAndAdd(1), playerName, teamName, gameName));
+    }
+
+    public void submitAnswer(String playerName, Integer optionIndex, String gameName) throws IOException {
+        out.writeObject(new AnswerMessage(AnswerMessagesId.getAndAdd(1), playerName, optionIndex, gameName));
+    }
+
+    /**
+     * Waits for a single server response after enrollment.
+     * If server replies with an error message the client prints it,
+     * updates the UI, closes resources and exits the process.
+     */
+    void waitForEnrollmentResponse() throws IOException, ClassNotFoundException {
+        Object obj;
+        try {
+            obj = in.readObject();
+        } catch (IOException e) {
+            // connection lost before response
+            System.out.println("No response from server.");
+            closeSilently();
+            System.exit(0);
+            return;
+        }
+
+        if (obj instanceof Message) {
+            Message response = (Message) obj;
+            String text = response.getMessage();
+
+            if (response.getId() == -1 || (text != null && text.toUpperCase().contains("ERROR"))) {
+                System.out.println("Server rejected enrollment: " + text);
                 closeSilently();
+                System.exit(0);
+            } else {
+                System.out.println("Server response: " + text);
+
+                // start listener to receive questions and other server messages
+                startListener();
             }
-        });
-        frame.setVisible(true);
+        } else {
+            System.out.println("Unexpected response from server.");
+        }
     }
 
-    void startReaderThread() {
-        Thread reader = new Thread(() -> {
+    private void startListener() {
+        running = true;
+        listenerThread = new Thread(() -> {
             try {
-                while (true) {
-                    Object obj = in.readObject();
-                    if (obj == null) break;
+                while (running) {
+                    Object incoming;
+                    try {
+                        incoming = in.readObject();
+                    } catch (IOException e) {
+                        System.out.println("Connection lost: " + e.getMessage());
+                        break;
+                    }
 
-                    if (obj instanceof Message) {
-                        Message msg = (Message) obj;
-                        String payload = msg.getMessage();
-                        Integer seconds = parseSecondsFromJson(payload);
-                        if (seconds != null) {
-                            SwingUtilities.invokeLater(() -> timerLabel.setText(seconds.toString()));
-                        } else {
-                            SwingUtilities.invokeLater(() -> timerLabel.setText(payload));
+                    if (incoming == null) {
+                        System.out.println("Stream closed by server.");
+                        break;
+                    }
+
+                    if (incoming instanceof QuestionMessage) {
+                        QuestionMessage questionMessage = (QuestionMessage) incoming;
+                        // update GUI with question (use q.toString() to avoid depending on unknown getters)
+                        SwingUtilities.invokeLater(() -> clientGui.displayQuestionAndOptions(questionMessage));
+                    } else if (incoming instanceof GameEndMessage) {
+                        GameEndMessage gameEndMessage = (GameEndMessage) incoming;
+                        // update GUI after Game Ends
+                        SwingUtilities.invokeLater(() -> clientGui.displayEndGame(gameEndMessage));
+                    } else if (incoming instanceof ScoresMessage) {
+                        ScoresMessage scoresMessage = (ScoresMessage) incoming;
+                        // update GUI after Game Ends
+                        SwingUtilities.invokeLater(() -> clientGui.displayRoundScores(scoresMessage));
+                    } else if (incoming instanceof Message) {
+                        Message m = (Message) incoming;
+                        String msgText = m.getMessage();
+                        if (msgText != null && (msgText.equals("FIM") || msgText.toUpperCase().contains("ERROR"))) {
+                            System.out.println("Server signaled end/error: " + msgText);
+                            break;
                         }
-                    } else if (obj instanceof String) {
-                        String line = (String) obj;
-                        Integer seconds = parseSecondsFromJson(line);
-                        if (seconds != null) {
-                            SwingUtilities.invokeLater(() -> timerLabel.setText(seconds.toString()));
-                        } else {
-                            SwingUtilities.invokeLater(() -> timerLabel.setText(line));
-                        }
+                        // otherwise can show other messages if needed
                     } else {
-                        System.out.println("Received object: " + obj.getClass() + " -> " + obj);
+                        System.out.println("Received object: " + incoming.getClass().getName());
                     }
                 }
-            } catch (IOException | ClassNotFoundException e) {
-                SwingUtilities.invokeLater(() -> timerLabel.setText("Disconnected"));
+            } catch (ClassNotFoundException e) {
+                System.out.println("Unknown incoming class.");
             } finally {
                 closeSilently();
             }
-        }, "TimerReader");
-        reader.setDaemon(true);
-        reader.start();
+        }, "ClientListenerThread");
+        listenerThread.setDaemon(true);
+        listenerThread.start();
     }
 
-    void sendMessage(String message) throws IOException {
-        Message messageToSend = new Message(0, message);
-        out.writeObject(messageToSend);
-        Message str;
-        try {
-            str = (Message) in.readObject();
-            System.out.println(str.getMessage());
-        } catch (ClassNotFoundException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-    }
-
-    private Integer parseSecondsFromJson(String jsonLine) {
-        // simple, robust parsing without external libs: look for "seconds":<number>
-        if (jsonLine == null) return null;
-        int idx = jsonLine.indexOf("\"seconds\":");
-        if (idx < 0) return null;
-        int start = idx + "\"seconds\":".length();
-        StringBuilder num = new StringBuilder();
-        while (start < jsonLine.length()) {
-            char c = jsonLine.charAt(start);
-            if (Character.isDigit(c)) {
-                num.append(c);
-            } else if (num.length() > 0) {
-                break;
-            }
-            start++;
-        }
-        try {
-            return num.length() > 0 ? Integer.parseInt(num.toString()) : null;
-        } catch (NumberFormatException e) {
-            return null;
-        }
+    void printMessage(String message) {
+        System.out.println(message);
     }
 
     private void closeSilently() {
         try { if (out != null) out.writeObject(new Message(-1, "FIM")); } catch (Exception ignored) {}
         try { if (in != null) in.close(); } catch (IOException ignored) {}
         try { if (out != null) out.close(); } catch (Exception ignored) {}
-        try { if (socket != null) socket.close(); } catch (IOException ignored) {}
+        try { if (socket != null) socket.close(); } catch (Exception ignored) {}
     }
 }
