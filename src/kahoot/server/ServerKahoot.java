@@ -1,5 +1,7 @@
 package kahoot.server;
 
+import kahoot.coordination.GameTask;
+import kahoot.coordination.GameThreadPool;
 import kahoot.coordination.ModifiedCountdownLatch;
 import kahoot.coordination.ModifiedCyclicBarrier;
 import kahoot.game.*;
@@ -21,6 +23,9 @@ public class ServerKahoot {
     private Map<String, GameState> gameStateMap;
     private Map<String, Player> playerMap;
     private final Map<String, ArrayList<DealWithClient>> clientsByGame;
+
+    //ThreadPool
+    private final GameThreadPool gamePool = new GameThreadPool();
 
     // Para perguntas individuais: latch por jogo
     private Map<String, ModifiedCountdownLatch> latchByGame;
@@ -83,10 +88,17 @@ public class ServerKahoot {
         } else {
             if(gameState.isGameFull()) {
                 System.out.println("The game is now full... Starting game: " + gameId);
-                broadcastNewQuestionToClients(gameId);
-                gameState.startGame();
+                //Cria GameTask e submete na ThreadPool
+                gamePool.submit(new GameTask(this, gameState));
+
             }
         }
+    }
+
+    //Metodo run do GameTask
+    public void runGame(GameState gameState){
+        broadcastNewQuestionToClients(gameState.getGameID());
+        gameState.startGame();
     }
 
     private synchronized boolean isIndividualQuestion(Integer questionIndex) {
@@ -415,6 +427,9 @@ public class ServerKahoot {
                 System.out.println("Failed to send game end: " + e.getMessage());
             }
         }
+
+        //Indicação à pool que pode iniciar outro jogo
+        gamePool.gameFinished();
     }
 
     public synchronized void broadcastNewQuestionToClients(String gameId) {
