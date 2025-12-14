@@ -51,6 +51,14 @@ public class GameState {
 
     //endregion
 
+    public synchronized void awardPoints(String playerName, String teamName, int points) {
+        players.get(playerName).addScore(points);
+        teams.get(teamName).updateScore();
+
+        playerScores.put(playerName, points);
+        teamScores.put(teamName, points);
+    }
+
     // ---- Question / game management ----
     public synchronized Question getCurrentQuestion() {
         int questionIndex = currentQuestionIndex.get();

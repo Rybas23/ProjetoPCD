@@ -19,12 +19,9 @@ public class Team {
         return true;
     }
 
-    public void recordAnswer(String username, boolean correct, int points) {
-        Player p = players.get(username);
-        if (p != null) {
-            int score = correct ? points : 0;
-            p.addScore(score);
-            totalScore += score;
+    public void updateScore() {
+        for (Player player : players.values()) {
+            totalScore += player.getScore();
         }
     }
 

@@ -20,7 +20,7 @@ public class Question {
     public ArrayList<String> getOptions() { return options; }
 
     public boolean isCorrect(int index) {
-        return index == correct;
+        return index + 1 == correct;
     }
 
     @Override

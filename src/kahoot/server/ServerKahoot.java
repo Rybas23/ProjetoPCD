@@ -125,7 +125,6 @@ public class ServerKahoot {
         }
 
         boolean isCorrect = question.isCorrect(answerIndex);
-        int multiplier;
 
         if (isIndividualQuestion(currentQuestionIndex)) {
             // PERGUNTA INDIVIDUAL: usa CountDownLatch
@@ -169,7 +168,7 @@ public class ServerKahoot {
         if (isCorrect) {
             int basePoints = question.getPoints();
             int points = basePoints * multiplier;
-            awardPoints(gameState, playerName, teamName, points);
+            gameState.awardPoints(playerName, teamName, points);
 
             broadcastScoresToClients(gameName);
         }
@@ -311,14 +310,6 @@ public class ServerKahoot {
                 broadcastScoresToClients(gameName);
             }
         }
-    }
-
-    private void awardPoints(GameState gameState, String playerName, String teamName, int points) {
-        Map<String, Integer> playerScores = gameState.getPlayerScores();
-        playerScores.put(playerName, playerScores.getOrDefault(playerName, 0) + points);
-
-        Map<String, Integer> teamScores = gameState.getTeamScores();
-        teamScores.put(teamName, teamScores.getOrDefault(teamName, 0) + points);
     }
 
     // ... (resto dos métodos permanecem iguais)
