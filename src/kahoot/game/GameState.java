@@ -16,7 +16,6 @@ public class GameState {
     private final int maxPlayersPerTeam;
 
     private volatile boolean gameOver = false;
-    private volatile boolean roundOver = false;
 
     public GameState(String gameID, Integer maxNumberOfTeams, Integer maxPlayersPerTeam, Integer numberOfQuestions, Quiz quiz) {
         if(quiz.questions.size() > numberOfQuestions) {
@@ -30,33 +29,38 @@ public class GameState {
     }
 
     //region ---- Métodos de gestão de equipas ----
-    public synchronized boolean addTeam(String teamName) {
+    public synchronized void addTeam(String teamName) {
         if (teamExists(teamName)) {
-            return false;
+            return;
         }
 
         teams.put(teamName, new Team(teamName));
-        return true;
     }
 
-    public synchronized boolean addPlayerToTeam(Player player) {
+    public synchronized void addPlayerToTeam(Player player) {
         if (!teams.containsKey(player.getTeamName()) && players.containsKey(player.getUsername())) {
-            return false;
+            return;
         }
 
         players.put(player.getUsername(), player);
         teams.get(player.getTeamName()).addPlayer(player);
-        return true;
     }
 
     //endregion
 
     public synchronized void awardPoints(String playerName, String teamName, int points) {
-        players.get(playerName).addScore(points);
-        teams.get(teamName).updateScore();
+        Player player = players.get(playerName);
+        if (player != null) {
+            player.addScore(points);
+            playerScores.put(playerName, player.getScore());
+        }
 
-        playerScores.put(playerName, points);
-        teamScores.put(teamName, points);
+        Team team = teams.get(teamName);
+        if (team != null) {
+            // Recompute or update team total from players
+            team.updateScore();
+            teamScores.put(teamName, team.getTotalScore());
+        }
     }
 
     // ---- Question / game management ----
@@ -83,13 +87,11 @@ public class GameState {
     }
 
     public synchronized Map<String, Integer> getTeamScores() {
-        for (Team team : teams.values()) teamScores.put(team.getName(), team.getTotalScore());
-        return teamScores;
+        return new HashMap<>(teamScores);
     }
 
     public synchronized Map<String, Integer> getPlayerScores() {
-        for (Player player : players.values()) playerScores.put(player.getUsername(), player.getScore());
-        return playerScores;
+        return new HashMap<>(playerScores);
     }
 
     public String getGameID() {

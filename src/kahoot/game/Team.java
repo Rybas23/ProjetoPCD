@@ -13,13 +13,15 @@ public class Team {
         this.totalScore = 0;
     }
 
-    public boolean addPlayer(Player player) {
-        if (players.containsKey(player.getUsername())) return false;
+    public void addPlayer(Player player) {
+        if (players.containsKey(player.getUsername())) {
+            return;
+        }
         players.put(player.getUsername(), player);
-        return true;
     }
 
     public void updateScore() {
+        totalScore = 0;
         for (Player player : players.values()) {
             totalScore += player.getScore();
         }
@@ -33,15 +35,7 @@ public class Team {
         return name;
     }
 
-    public Player getPlayer(String username) {
-        return players.get(username);
-    }
-
     public int getTotalScore() {
         return totalScore;
-    }
-
-    public boolean playerExists(String username) {
-        return players.containsKey(username);
     }
 }

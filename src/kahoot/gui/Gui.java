@@ -7,6 +7,8 @@ import kahoot.messages.ScoresMessage;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
@@ -21,7 +23,7 @@ public class Gui {
     private final ClientKahoot client;
 
     private JFrame frame;
-    private JLabel questionLabel;
+    private JTextArea questionLabel;
     private JPanel answersPanel;
     private JLabel timerLabel;
     private JPanel scoreboardPanel;
@@ -37,11 +39,16 @@ public class Gui {
 
     private void createGui() {
         frame = new JFrame("Kahoot Client - Timer");
-        questionLabel = new JLabel("Connecting...", SwingConstants.CENTER);
+
+        questionLabel = new JTextArea("Connecting...");
         questionLabel.setFont(new Font("SansSerif", Font.BOLD, 24));
-        questionLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        questionLabel.setEditable(false);
+        questionLabel.setLineWrap(true);
+        questionLabel.setWrapStyleWord(true);
+        questionLabel.setOpaque(false);
         questionLabel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         questionLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        questionLabel.setFocusable(false);
 
         timerLabel = new JLabel("Time left: --s");
         timerLabel.setHorizontalAlignment(SwingConstants.CENTER);
@@ -61,7 +68,8 @@ public class Gui {
         frame = new JFrame("Kahoot - " + username + " (" + teamName + ")" + " - " + gameName);
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         frame.setLocationRelativeTo(null);
-        frame.setSize(800, 600);
+        frame.setSize(1000, 600);
+        frame.setResizable(false);
         frame.getContentPane().setLayout(new BorderLayout(0, 10));
         frame.getContentPane().add(north, BorderLayout.NORTH);
 
@@ -173,23 +181,12 @@ public class Gui {
         answersPanel.removeAll();
 
         for (int i = 0; i < questionMessage.getOptions().size(); i++) {
-            int index = i;
-            JButton btn = new JButton(questionMessage.getOptions().get(i));
-            btn.setFont(new Font("SansSerif", Font.BOLD, 14));
-            btn.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-            btn.addActionListener(e -> handleAnswer(index, btn, gameName));
+            JButton btn = createAnswerButton(questionMessage.getOptions().get(i), i);
             answersPanel.add(btn);
         }
 
         answersPanel.revalidate();
         answersPanel.repaint();
-    }
-
-    public void displayQuestionAndOptions(QuestionMessage questionMessage, ScoresMessage scoresMessage) {
-        displayQuestionAndOptions(questionMessage);
-        if (scoresMessage != null) {
-            updateScoreboard(scoresMessage);
-        }
     }
 
     /** Atualiza o painel do scoreboard mantendo-o sempre visível. */
@@ -232,7 +229,7 @@ public class Gui {
     }
 
     //Envia a resposta para o GameState
-    private void handleAnswer(int optionIndex, JButton clickedButton, String gameName) {
+    private void handleAnswer(int optionIndex, String gameName) {
         try {
             client.submitAnswer(username, optionIndex, gameName);
             disableButtons();
@@ -246,4 +243,42 @@ public class Gui {
             if (c instanceof JButton) c.setEnabled(false);
         }
     }
+
+    private static String escapeHtml(String text) {
+        if (text == null) return "";
+        return text
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
+    }
+
+    private JButton createAnswerButton(String raw, int index) {
+        JButton btn = new JButton();
+        btn.setLayout(new GridBagLayout()); // centers child by default
+        btn.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        btn.setFocusable(false);
+
+        String html = "<html><div style='text-align:center; width:220px;'>"
+                + escapeHtml(raw).replace("\n", "<br/>")
+                + "</div></html>";
+        JLabel label = new JLabel(html, SwingConstants.CENTER);
+        label.setOpaque(false);
+        label.setFocusable(false);
+        label.setForeground(btn.getForeground());
+
+        // forward clicks from the label to the button
+        label.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                btn.doClick();
+            }
+        });
+
+        btn.addActionListener(e -> handleAnswer(index, gameName));
+        btn.add(label); // GridBagLayout centers the label
+
+        return btn;
+    }
+
 }

@@ -17,18 +17,18 @@ import java.util.concurrent.TimeoutException;
 import static kahoot.utils.Utilities.*;
 
 public class ServerKahoot {
-    private Map<String, ArrayList<Integer>> answersMap;
-    private Map<String, GameState> gameStateMap;
-    private Map<String, Player> playerMap;
-    private final Map<String, ArrayList<DealWithClient>> clientsByGame;
+    private final Map<String, ArrayList<Integer>> answersMap = new HashMap<>();
+    private final Map<String, GameState> gameStateMap = new HashMap<>();
+    private final Map<String, Player> playerMap = new HashMap<>();
+    private final Map<String, ArrayList<DealWithClient>> clientsByGame = new HashMap<>();
 
     // Para perguntas individuais: latch por jogo
-    private Map<String, ModifiedCountdownLatch> latchByGame;
-    private Map<String, Integer> latchQuestionIndex;
+    private final Map<String, ModifiedCountdownLatch> latchByGame = new HashMap<>();
+    private final Map<String, Integer> latchQuestionIndex = new HashMap<>();
 
     // Para perguntas de equipa: barreira por equipa
-    private Map<String, Map<String, ModifiedCyclicBarrier>> barriersByGameAndTeam;
-    private Map<String, Map<String, List<Boolean>>> teamAnswersByGame; // Boolean para correto/incorreto
+    private final Map<String, Map<String, ModifiedCyclicBarrier>> barriersByGameAndTeam = new HashMap<>();
+    private final Map<String, Map<String, List<Boolean>>> teamAnswersByGame = new HashMap<>();
 
     private final Map<String, Thread> timerThreads = new HashMap<>();
 
@@ -43,17 +43,6 @@ public class ServerKahoot {
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    public ServerKahoot() {
-        this.gameStateMap = new HashMap<>();
-        this.playerMap = new HashMap<>();
-        this.clientsByGame = new HashMap<>();
-        this.answersMap = new HashMap<>();
-        this.latchByGame = new HashMap<>();
-        this.latchQuestionIndex = new HashMap<>();
-        this.barriersByGameAndTeam = new HashMap<>();
-        this.teamAnswersByGame = new HashMap<>();
     }
 
     public void startServer() throws IOException {
@@ -98,41 +87,51 @@ public class ServerKahoot {
      * Para perguntas individuais: usa CountDownLatch
      * Para perguntas de equipa: usa CyclicBarrier
      */
-    public synchronized void registerAnswer(String playerName, Integer answerIndex, String gameName) {
-        GameState gameState = gameStateMap.get(gameName);
-        if (gameState == null) {
-            return;
+    public void registerAnswer(String playerName, Integer answerIndex, String gameName) {
+        GameState gameState;
+        int currentQuestionIndex;
+        ArrayList<Integer> playerAnswers;
+        Player player;
+        Question question;
+        boolean isIndividual;
+        boolean isCorrect;
+
+        synchronized (this) {
+            gameState = gameStateMap.get(gameName);
+            if (gameState == null) {
+                return;
+            }
+
+            currentQuestionIndex = gameState.getCurrentQuestionIndex().get();
+            playerAnswers = answersMap.computeIfAbsent(playerName, k -> new ArrayList<>());
+
+            // ignore duplicate answers
+            if (playerAnswers.size() > currentQuestionIndex) {
+                return;
+            }
+
+            playerAnswers.add(answerIndex);
+            player = playerMap.get(playerName);
+            if (player == null) {
+                return;
+            }
+
+            question = gameState.getCurrentQuestion();
+            if (question == null) {
+                return;
+            }
+
+            isIndividual = isIndividualQuestion(currentQuestionIndex);
+            isCorrect = question.isCorrect(answerIndex);
         }
 
-        int currentQuestionIndex = gameState.getCurrentQuestionIndex().get();
-        ArrayList<Integer> playerAnswers = answersMap.computeIfAbsent(playerName, k -> new ArrayList<>());
-
-        // Ignorar respostas duplicadas
-        if (playerAnswers.size() > currentQuestionIndex) {
-            return;
-        }
-
-        playerAnswers.add(answerIndex);
-        Player player = playerMap.get(playerName);
-        if (player == null) {
-            return;
-        }
-
-        String teamName = player.getTeamName();
-        Question question = gameState.getCurrentQuestion();
-        if (question == null) {
-            return;
-        }
-
-        boolean isCorrect = question.isCorrect(answerIndex);
-
-        if (isIndividualQuestion(currentQuestionIndex)) {
+        if (isIndividual) {
             // PERGUNTA INDIVIDUAL: usa CountDownLatch
-            handleIndividualQuestion(gameName, gameState, playerName, teamName,
+            handleIndividualQuestion(gameName, playerName, player.getTeamName(),
                     currentQuestionIndex, question, isCorrect);
         } else {
             // PERGUNTA DE EQUIPA: usa CyclicBarrier
-            handleTeamQuestion(gameName, gameState, playerName, teamName,
+            handleTeamQuestion(gameName, player.getTeamName(),
                     currentQuestionIndex, question, isCorrect);
         }
     }
@@ -141,9 +140,14 @@ public class ServerKahoot {
      * Trata pergunta individual com CountDownLatch.
      * Primeiros 2 jogadores recebem multiplicador 2x dos pontos da pergunta.
      */
-    private void handleIndividualQuestion(String gameName, GameState gameState, String playerName, String teamName, int questionIndex, Question question, boolean isCorrect) {
+    private void handleIndividualQuestion(String gameName, String playerName, String teamName, int questionIndex, Question question, boolean isCorrect) {
         ModifiedCountdownLatch latch = latchByGame.get(gameName);
         Integer storedQ = latchQuestionIndex.get(gameName);
+
+        GameState gameState = gameStateMap.get(gameName);
+        if (gameState == null) {
+            return;
+        }
 
         if (latch == null || storedQ == null || storedQ != questionIndex) {
             int total = Math.max(1, gameState.getTotalNumberOfPlayers());
@@ -178,13 +182,18 @@ public class ServerKahoot {
      * Trata pergunta de equipa com CyclicBarrier.
      * Aguarda todas as respostas da equipa ou timeout.
      */
-    private void handleTeamQuestion(String gameName, GameState gameState, String playerName, String teamName, int questionIndex, Question question, boolean isCorrect) {
+    private void handleTeamQuestion(String gameName, String teamName, int questionIndex, Question question, boolean isCorrect) {
         Map<String, ModifiedCyclicBarrier> barriers = barriersByGameAndTeam.computeIfAbsent(
                 gameName, k -> new HashMap<>()
         );
         Map<String, List<Boolean>> teamAnswers = teamAnswersByGame.computeIfAbsent(
                 gameName, k -> new HashMap<>()
         );
+
+        GameState gameState = gameStateMap.get(gameName);
+        if (gameState == null) {
+            return;
+        }
 
         Team team = gameState.getTeam(teamName);
         if (team == null) {
@@ -195,7 +204,7 @@ public class ServerKahoot {
         String barrierKey = teamName + "_q" + questionIndex;
 
         if (!barriers.containsKey(barrierKey)) {
-            Runnable barrierAction = () -> calculateTeamScore(gameName, gameState, teamName,
+            Runnable barrierAction = () -> calculateTeamScore(gameName, teamName,
                     questionIndex, question, barrierKey);
             ModifiedCyclicBarrier barrier =
                     new ModifiedCyclicBarrier(teamSize, QUESTION_TIMEOUT_MS, barrierAction);
@@ -222,7 +231,12 @@ public class ServerKahoot {
      * Todos corretos: 2x pontos base da pergunta.
      * Algum errado: apenas melhor resposta individual (1x pontos base).
      */
-    private synchronized void calculateTeamScore(String gameName, GameState gameState, String teamName, int questionIndex, Question question, String barrierKey) {
+    private synchronized void calculateTeamScore(String gameName, String teamName, int questionIndex, Question question, String barrierKey) {
+        GameState gameState = gameStateMap.get(gameName);
+        if (gameState == null) {
+            return;
+        }
+
         Map<String, List<Boolean>> teamAnswers = teamAnswersByGame.get(gameName);
         if (teamAnswers == null) {
             return;
@@ -234,30 +248,57 @@ public class ServerKahoot {
         }
 
         boolean allCorrect = answers.stream().allMatch(a -> a);
-        long correctCount = answers.stream().filter(a -> a).count();
-
         int basePoints = question.getPoints();
-        int points;
 
-        if (allCorrect) {
-            points = basePoints * 2;      // todos acertam \-> cotação duplicada
-        } else if (correctCount > 0) {
-            points = basePoints;          // alguma correta \-> melhor resposta (sem bónus)
-        } else {
-            points = 0;                   // todas erradas
+        // collect players in the team
+        List<Player> teamPlayers = new ArrayList<>();
+        for (Player p : gameState.getPlayers()) {
+            if (teamName.equals(p.getTeamName())) {
+                teamPlayers.add(p);
+            }
         }
 
-        if (points > 0) {
-            Map<String, Integer> teamScores = gameState.getTeamScores();
-            teamScores.put(teamName, teamScores.getOrDefault(teamName, 0) + points);
+        if (teamPlayers.isEmpty()) {
+            // clear and finish
+            teamAnswers.remove(barrierKey);
+            handleQuestionComplete(gameName, gameState, true);
+            return;
+        }
 
+        // find which players actually answered correctly (using answersMap)
+        List<Player> correctPlayers = new ArrayList<>();
+        for (Player p : teamPlayers) {
+            ArrayList<Integer> playerAnswers = answersMap.get(p.getUsername());
+            if (playerAnswers != null && playerAnswers.size() > questionIndex) {
+                Integer ansIdx = playerAnswers.get(questionIndex);
+                if (ansIdx != null && question.isCorrect(ansIdx)) {
+                    correctPlayers.add(p);
+                }
+            }
+        }
+
+        if (!correctPlayers.isEmpty()) {
+            if (allCorrect && correctPlayers.size() == teamPlayers.size()) {
+                // every team member correct -> each player gets 2x base points
+                int ptsPerPlayer = basePoints * 2;
+                for (Player p : teamPlayers) {
+                    gameState.awardPoints(p.getUsername(), teamName, ptsPerPlayer);
+                }
+            } else {
+                // some correct -> each correct player gets base points
+                for (Player p : correctPlayers) {
+                    gameState.awardPoints(p.getUsername(), teamName, basePoints);
+                }
+            }
+
+            // broadcast updated scores
             broadcastScoresToClients(gameName);
         }
 
-        // limpar respostas desta pergunta/equipa
+        // clear stored answers for this question/team
         teamAnswers.remove(barrierKey);
 
-        // depois de tratar a pontuação da equipa, verificar se a pergunta terminou
+        // after handling team score, check question completion
         handleQuestionComplete(gameName, gameState, true);
     }
 
@@ -377,12 +418,15 @@ public class ServerKahoot {
     public synchronized void broadcastScoresToClients(String gameId) {
         GameState gameState = gameStateMap.get(gameId);
         ArrayList<DealWithClient> clients = getClientsToBroadcast(gameId);
-        if (clients == null) return;
+        if (clients == null || gameState == null) return;
+
+        Map<String, Integer> teamScoresSnapshot = gameState.getTeamScores();
+        Map<String, Integer> playerScoresSnapshot = gameState.getPlayerScores();
 
         for (DealWithClient client : clients) {
             try {
                 client.sendObject(new ScoresMessage(ScoresMessagesId.getAndAdd(1),
-                        gameState.getTeamScores(), gameState.getPlayerScores()));
+                        teamScoresSnapshot, playerScoresSnapshot));
             } catch (Exception e) {
                 System.out.println("Failed to send scores: " + e.getMessage());
             }
@@ -392,15 +436,19 @@ public class ServerKahoot {
     public synchronized void broadcastGameEndToClients(String gameId) {
         GameState gameState = gameStateMap.get(gameId);
         ArrayList<DealWithClient> clients = getClientsToBroadcast(gameId);
-        if (clients == null) return;
+        if (clients == null || gameState == null) return;
 
         // stop any running timer for this game
         stopQuestionTimer(gameId);
 
+        Map<String, Integer> teamScoresSnapshot = gameState.getTeamScores();
+        Map<String, Integer> playerScoresSnapshot = gameState.getPlayerScores();
+
+
         for (DealWithClient client : clients) {
             try {
                 client.sendObject(new GameEndMessage(GameEndMessagesId.getAndAdd(1),
-                        gameState.getTeamScores(), gameState.getPlayerScores()));
+                        teamScoresSnapshot, playerScoresSnapshot));
                 gameStateMap.remove(gameId);
             } catch (Exception e) {
                 System.out.println("Failed to send game end: " + e.getMessage());
@@ -445,10 +493,9 @@ public class ServerKahoot {
         if (gameState == null) return;
 
         int qIndex = gameState.getCurrentQuestionIndex().get();
-        long totalMillis = QUESTION_TIMEOUT_MS;
 
         Thread t = new Thread(() -> {
-            long end = System.currentTimeMillis() + totalMillis;
+            long end = System.currentTimeMillis() + QUESTION_TIMEOUT_MS;
             while (!Thread.currentThread().isInterrupted()) {
                 long remaining = end - System.currentTimeMillis();
                 if (remaining <= 0) {

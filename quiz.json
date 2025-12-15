@@ -3,7 +3,7 @@
   "questions": [
     {
       "question": "O que é uma thread?",
-      "correct": 3,
+      "correct": 2,
       "points":5,
       "options": [
         "Processo",
@@ -14,7 +14,7 @@
     },
     {
       "question": "Qual destas opções não é um método bloqueante?",
-      "correct": 2,
+      "correct": 1,
       "points":5,
       "options": [
         "join()",
