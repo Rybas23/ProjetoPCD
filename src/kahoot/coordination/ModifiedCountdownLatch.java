@@ -10,10 +10,8 @@ public class ModifiedCountdownLatch {
     private final Lock lock = new ReentrantLock();
     private final Condition released = lock.newCondition();
 
-    private final int maxBonusAnswers;
     private final int bonusMultiplier;
     private final long timeoutMillis;
-    private final int totalPlayers;
 
     private int remainingToAnswer;
     private int bonusLeft;
@@ -24,10 +22,8 @@ public class ModifiedCountdownLatch {
             throw new IllegalArgumentException("totalPlayers must be > 0");
         }
 
-        this.maxBonusAnswers = maxBonusAnswers;
         this.bonusMultiplier = bonusMultiplier;
         this.timeoutMillis = timeoutMillis;
-        this.totalPlayers = totalPlayers;
 
         this.remainingToAnswer = totalPlayers;
         this.bonusLeft = maxBonusAnswers;

@@ -13,7 +13,7 @@ import java.net.Socket;
 import java.net.SocketException;
 
 public class DealWithClient extends Thread{
-    private Socket socket;
+    private final Socket socket;
     private ObjectOutputStream out;
     private ObjectInputStream in;
     private final ServerKahoot server;
@@ -55,8 +55,7 @@ public class DealWithClient extends Thread{
                     break;
                 }
 
-                if (readObject instanceof Message) {
-                    Message message = (Message) readObject;
+                if (readObject instanceof Message message) {
 
                     if (message.getMessage().equals("FIM") || message.getMessage().contains("ERROR:")) {
                         out.writeObject(message);
@@ -66,10 +65,9 @@ public class DealWithClient extends Thread{
 
                     System.out.println("Eco:" + message.getMessage() + message.getId());
                     out.writeObject(message);
-                } else if (readObject instanceof EnrollmentMessage) {
+                } else if (readObject instanceof EnrollmentMessage enrollmentMessage) {
                     System.out.print("Got:");
 
-                    EnrollmentMessage enrollmentMessage = (EnrollmentMessage) readObject;
                     System.out.print(enrollmentMessage);
 
                     Player player = new Player(enrollmentMessage.getPlayerName(), enrollmentMessage.getTeamName());
@@ -90,10 +88,9 @@ public class DealWithClient extends Thread{
 
                         server.checkIfGameIsFull(enrollmentMessage.getGameName());
                     }
-                } else if (readObject instanceof AnswerMessage) {
+                } else if (readObject instanceof AnswerMessage answerMessage) {
                     System.out.print("Got:");
 
-                    AnswerMessage answerMessage = (AnswerMessage) readObject;
                     System.out.print(answerMessage);
 
                     server.registerAnswer(answerMessage.getPlayerName(), answerMessage.getAnswerIndex(), answerMessage.getGameName());

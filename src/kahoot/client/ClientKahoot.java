@@ -78,8 +78,7 @@ public class ClientKahoot {
             return;
         }
 
-        if (obj instanceof Message) {
-            Message response = (Message) obj;
+        if (obj instanceof Message response) {
             String text = response.getMessage();
 
             if (response.getId() == -1 || (text != null && text.toUpperCase().contains("ERROR"))) {
@@ -129,25 +128,20 @@ public class ClientKahoot {
                         break;
                     }
 
-                    if (incoming instanceof QuestionMessage) {
-                        QuestionMessage questionMessage = (QuestionMessage) incoming;
+                    if (incoming instanceof QuestionMessage questionMessage) {
                         // update GUI with question (use q.toString() to avoid depending on unknown getters)
                         SwingUtilities.invokeLater(() -> clientGui.displayQuestionAndOptions(questionMessage));
-                    } else if (incoming instanceof GameEndMessage) {
-                        GameEndMessage gameEndMessage = (GameEndMessage) incoming;
+                    } else if (incoming instanceof GameEndMessage gameEndMessage) {
                         // update GUI after Game Ends
                         SwingUtilities.invokeLater(() -> clientGui.displayGameStats(gameEndMessage, "Game Over - Final Scores"));
-                    } else if (incoming instanceof ScoresMessage) {
-                        ScoresMessage scoresMessage = (ScoresMessage) incoming;
+                    } else if (incoming instanceof ScoresMessage scoresMessage) {
                         // update GUI after Game Ends
                         SwingUtilities.invokeLater(() -> clientGui.updateScoreboard(scoresMessage));
-                    } else if (incoming instanceof TimerMessage) {
-                        TimerMessage timerMessage = (TimerMessage) incoming;
+                    } else if (incoming instanceof TimerMessage timerMessage) {
                         // convert to seconds, clamp to >= 0
                         long seconds = Math.max(0, timerMessage.getRemainingMillis() / 1000);
                         SwingUtilities.invokeLater(() -> clientGui.updateTimer(seconds));
-                    } else if (incoming instanceof Message) {
-                        Message m = (Message) incoming;
+                    } else if (incoming instanceof Message m) {
                         String msgText = m.getMessage();
                         if (msgText != null && (msgText.equals("FIM") || msgText.toUpperCase().contains("ERROR"))) {
                             System.out.println("Server signaled end/error: " + msgText);

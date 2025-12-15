@@ -27,9 +27,6 @@ public class ServerKahoot {
     //ThreadPool
     private final GameThreadPool gamePool = new GameThreadPool();
 
-    //ThreadPool
-    private final GameThreadPool gamePool = new GameThreadPool();
-
     // Para perguntas individuais: latch por jogo
     private final Map<String, ModifiedCountdownLatch> latchByGame = new HashMap<>();
     private final Map<String, Integer> latchQuestionIndex = new HashMap<>();
